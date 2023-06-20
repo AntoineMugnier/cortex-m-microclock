@@ -16,8 +16,8 @@ pub trait Microclock{
     fn start(&mut self);
     fn stop(&mut self);
     fn reset(&mut self);
-    fn now(&mut self) -> Self::Instant;
-    fn delay(&mut self, duration: Self::Duration);
+    fn now(&self) -> Self::Instant;
+    fn delay(&self, duration: Self::Duration);
 }
 
 impl <const TIMER_HZ: u32> Microclock for CYCCNTClock<TIMER_HZ>{ 
@@ -32,7 +32,7 @@ impl <const TIMER_HZ: u32> Microclock for CYCCNTClock<TIMER_HZ>{
         self.dwt.disable_cycle_counter();
     }
 
-    fn now(&mut self) -> Self::Instant {
+    fn now(&self) -> Self::Instant {
         let acc_cyccnt_val : u64 = (self.nb_cyccnt_cycles as u64) *(Self::MAX_CYCCNT_VAL as u64 +1) + (self.dwt.cyccnt.read() as u64);
         Self::Instant::from_ticks(acc_cyccnt_val)
     }
@@ -43,7 +43,7 @@ impl <const TIMER_HZ: u32> Microclock for CYCCNTClock<TIMER_HZ>{
        self.nb_cyccnt_cycles = 0;
     }
 
-    fn delay(&mut self, duration: Self::Duration) {
+    fn delay(&self, duration: Self::Duration) {
         let instant_init = self.now();
         while (self.now() - instant_init) < duration{
             // NOP

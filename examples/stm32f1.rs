@@ -1,6 +1,6 @@
 #![no_main]
 #![no_std]
-use cortex_m_rt::entry;
+use cortex_m_rt::{entry, exception};
 
 use stm32f1::stm32f103;
 use cortex_m::peripheral;
@@ -41,7 +41,7 @@ fn main() -> ! {
         let init_inst = microclock.now();
         microclock.delay(duration);
         let t = microclock.now() - init_inst;
-        defmt::info!("time_ms {}", t.to_micros());
+        defmt::info!("time_us {}", t.to_micros());
     } 
     defmt::info!("Start");
     microclock.delay(duration);
@@ -50,4 +50,7 @@ fn main() -> ! {
     loop{}
 }
 
+#[exception]
+fn SysTick(){
 
+}
