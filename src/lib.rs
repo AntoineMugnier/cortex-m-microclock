@@ -25,7 +25,6 @@ impl <const TIMER_HZ: u32> Microclock for CYCCNTClock<TIMER_HZ>{
     type Duration = fugit::TimerDurationU64<TIMER_HZ>;
     
     fn start(&mut self){
-        self.reset();
         self.dwt.enable_cycle_counter();
     }
     

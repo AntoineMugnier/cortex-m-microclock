@@ -8,7 +8,7 @@
 # runner = "arm-none-eabi-gdb -q -x openocd.gdb"
 # runner = "gdb-multiarch -q -x openocd.gdb"
 # runner = "gdb -q -x openocd.gdb"
-runner = "probe-run --chip STM32F103C8 --verbose"
+runner = "probe-run --chip STM32F103C8"
 rustflags = [
   # --- KEEP existing `link-arg` flags ---
   #  "-C", "link-arg=-Tlink.x",

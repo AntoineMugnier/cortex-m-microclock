@@ -7,7 +7,7 @@ use cortex_m::peripheral;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
-use cortex_m_microclock::MicroClock;
+use cortex_m_microclock::{CYCCNTClock, Microclock};
 
 #[entry]
 fn main() -> ! {
@@ -31,7 +31,23 @@ fn main() -> ! {
     //Configure main clock
     let mut dcb = cp.DCB;
     let dwt = cp.DWT;
-    let sysclk_freq_hz = 8_000_000;
-    let microclock = MicroClock::new(&mut dcb, dwt, sysclk_freq_hz);
+
+    const SYSCLK_FREQ_HZ: u32 = 8_000_000;
+
+    let mut microclock = CYCCNTClock::<SYSCLK_FREQ_HZ>::new(&mut dcb, dwt);
+    microclock.start();
+    let duration = <CYCCNTClock::<SYSCLK_FREQ_HZ> as Microclock>::Duration::secs(1);
+    while true {
+        let init_inst = microclock.now();
+        microclock.delay(duration);
+        let t = microclock.now() - init_inst;
+        defmt::info!("time_ms {}", t.to_micros());
+    } 
+    defmt::info!("Start");
+    microclock.delay(duration);
+    defmt::info!("End");
+
     loop{}
 }
+
+
