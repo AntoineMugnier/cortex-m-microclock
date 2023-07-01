@@ -1,69 +1,160 @@
+//! This crate provides a software clock (`CYCCNTClock`) allowing to measure time durations and produce delays in a 
+//! cortex-m core at a microsecond scale.
+//! 
+//! ***Note***: Some Cortex-M cores like M0, M0+ and M23 cores does not have a CYCCNT counter.
+//! Therefore, the present crate cannot be used on these chips
+//!
+//! # Underlaying hardware
+//! The clock is based on the CYCCNT counter from the Cortex-M DWT peripheral, which increments
+//! with each SYSCLK tick. However as the CYCCNT upcounter is only 32 bits wide, it may overflow 
+//! quite rapidly depending on your SYSCLK frequency. The `CYCCNTClock` allows to keep track of 
+//! multiple CYCCNT cycles and can be used to evaluate very large durations of time.
+//!
+//! # The clock as a singleton
+//! The `CYCCNTClock` structure is a singleton. This implies that the structure must not be
+//! instanciated and that all its methods are static. Those methods can be called from any thread
+//! without concurrency issues.  
+//! This design patern allows minimal verbosity in configuring and using the clock.
+//! 
+//! # How to use this crate
+//! In order to use the clock you should first call the `init()` method which take ownership of
+//! the DWT peripheral. From this point you can use `now()` and `delay()` methods.
+//! The `update()` method should be called periodically to avoid missing 
+//! the CYCCNT wrapping around.
+//! 
+//!# Credits
+//!  Many thanks to the authors of `fugit` and `rtic::dwt_systick_monotonic` crates
+//!
+//!
+
 #![no_std]
 
 use cortex_m::peripheral::{DCB, DWT};
+use cortex_m::interrupt::{self, Mutex};
+use core::{cell::RefCell, ops::DerefMut};
+use cortex_m::asm;
 
 pub type Instant<const TIMER_HZ: u32> = fugit::TimerInstantU64<TIMER_HZ>;
 pub type Duration<const TIMER_HZ: u32> = fugit::TimerDurationU64<TIMER_HZ>;
- 
-pub struct CYCCNTClock<const SYSCLK_HZ: u32>{
-    dwt: DWT,
-    previous_cyccnt_val : u32,
-    nb_cyccnt_cycles : u32,
-}
 
-impl <const SYSCLK_HZ :u32 >Drop for  CYCCNTClock<SYSCLK_HZ>{
-    fn drop(&mut self) {
-        self.dwt.disable_cycle_counter();
-    }
+static DWT:Mutex<RefCell<Option<DWT>>> =
+    Mutex::new(RefCell::new(None));
+
+static PREVIOUS_CYCCNT_VAL : Mutex<RefCell<usize>> = Mutex::new(RefCell::new(0));
+static NB_CYCCNT_CYCLES : Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+
+
+/// Clock based on the Cortex-M CYCCNT counter allowing to measure time durations and produce
+/// delays.  
+/// Precise at a microsecond scale if your SYSCLK clock is greater than 1MHz
+pub struct CYCCNTClock<const SYSCLK_HZ: u32>{
 }
 
 impl <const SYSCLK_HZ :u32 > CYCCNTClock<SYSCLK_HZ>{
 
    const MAX_CYCCNT_VAL: u32 = core::u32::MAX;
-   
-    pub fn now(&mut self) -> Instant<SYSCLK_HZ> {
+
+    /// Return an `Instant` object corresponding to a snapshot created at the time this method was called.
+    /// Panic if the counter has not been initialized with `init()` before.
+    ///
+    /// ```
+    ///    const SYSCLK_FREQ_HZ : u32 = 8_000_000;
+    ///    let t1 = CYCCNTClock<SYSCLK_FREQ_HZ>::now();
+    ///     
+    ///    // Wait 100 us
+    ///    let duration = Duration::micros(100);
+    ///    CYCCNTClock<SYSCLK_FREQ_HZ>::delay(duration)
+    ///    
+    ///    let t2 = CYCCNTClock<SYSCLK_FREQ_HZ>::now();
+    ///    let elpased_time = t2 - t1; // Very small elapsed time
+    ///    println!("time_us {}", elapsed_time.to_micros());
+    /// ```
+    pub fn now() -> Instant<SYSCLK_HZ> {
+        interrupt::free( |cs|{
+          //Call `update()` because the CYCCNT counter could have wrapped around since the last time
+          //`update()` was called
+          Self::update();
+       
+          let nb_cyccnt_cycles : u32 = *NB_CYCCNT_CYCLES.borrow(cs).borrow();
+          
+          if let Some(ref mut dwt) = DWT.borrow(cs).borrow_mut().deref_mut(){
+              let acc_cyccnt_val : u64 = (nb_cyccnt_cycles as u64) *(Self::MAX_CYCCNT_VAL as u64 +1) + (dwt.cyccnt.read() as u64);
+              Instant::from_ticks(acc_cyccnt_val)
+          }
+          else{
+              panic!("Counter not initialized");
+          }
+        })
+    }
         
-        //Call `update()` because the CYCCNT counter could have wrapped around since the last time
-        //`update()` was called
-        self.update();
-
-        let acc_cyccnt_val : u64 = (self.nb_cyccnt_cycles as u64) *(Self::MAX_CYCCNT_VAL as u64 +1) + (self.dwt.cyccnt.read() as u64);
-        Instant::from_ticks(acc_cyccnt_val)
-    }
-
-    pub fn delay(&mut self, duration: Duration<SYSCLK_HZ>) {
-        let instant_init = self.now();
-        while (self.now() - instant_init) < duration{
-            // NOP
+    /// Blocking wait for the duration specified as argument
+    /// Interrupts can still trigger during this call.
+    /// Panic if the counter has not been initialized with `init()` before.
+    /// ```
+    ///    const SYSCLK_FREQ_HZ : u32 = 8_000_000;
+    ///    let t1 = CYCCNTClock<SYSCLK_FREQ_HZ>::now();
+    ///     
+    ///    // Wait 100 us
+    ///    let duration = Duration::micros(100);
+    ///    CYCCNTClock<SYSCLK_FREQ_HZ>::delay(duration)
+    ///    
+    ///    let t2 = CYCCNTClock<SYSCLK_FREQ_HZ>::now();
+    ///    let elpased_time = t2 - t1; // Very small elapsed time
+    ///    println!("time_us {}", elapsed_time.to_micros());
+    /// ```
+    pub fn delay(duration: Duration<SYSCLK_HZ>) {
+        let instant_init = Self::now();
+        while (Self::now() - instant_init) < duration{
+            asm::nop();
         }
     }
-
-   pub fn update(&mut self){
+    
+    /// Synchronize the hardware counter with this clock.
+    /// Must be called at least one time for every CYCCNT counter cycle after init. Otherwise
+    /// time counting will be corrupted.
+    /// Generally, calling this method in every SysTick IRQ call is the simpler option
+    /// This method will NOT panic if the `init()` method has not be called first.
+   pub fn update(){
         
-        let cyccnt_val = self.dwt.cyccnt.read();
+       interrupt::free( |cs|{
+            if let Some(ref mut dwt) = DWT.borrow(cs).borrow_mut().deref_mut(){
+                let cyccnt_val = dwt.cyccnt.read();
+                
+                let mut previous_cyccnt_val = PREVIOUS_CYCCNT_VAL.borrow(cs).borrow_mut();
+                
+                // increment the number of counted CYCCNT cycles in case of CYCCNT counter overflow
+                if *previous_cyccnt_val as u32 > cyccnt_val {
+                    let mut nb_cyccnt_cycles = NB_CYCCNT_CYCLES.borrow(cs).borrow_mut();
+                    *nb_cyccnt_cycles+=1;
+                }
 
-        // increment the number of counted CYCCNT cycles in case of CYCCNT counter overflow
-        if self.previous_cyccnt_val > cyccnt_val {
-            self.nb_cyccnt_cycles+=1;
-        }
-
-        self.previous_cyccnt_val = cyccnt_val;
+                *previous_cyccnt_val = cyccnt_val as usize;
+            } 
+        });
     }
+    
+    /// Enable CYCCNT counting capability of the cortex core and
+    /// start the couting
+    ///```
+    /// let mut cp = cortex_m::Peripherals::take().unwrap();
+    /// let mut dcb = cp.DCB;
+    /// let dwt = cp.DWT;
+    /// CYCCNTClock<SYSCLK_FREQ_HZ>::init(&mut dcb, dwt);
+    ///```
+    pub fn init(dcb: &mut DCB, mut dwt : DWT){
 
-    pub fn new(dcb: &mut DCB, mut dwt : DWT) -> CYCCNTClock<SYSCLK_HZ>{
+       interrupt::free( |cs|{
+            assert!(DWT::has_cycle_counter());
 
-        dcb.enable_trace();
-        DWT::unlock();
-        assert!(DWT::has_cycle_counter());
-        dwt.enable_cycle_counter();
-        dwt.set_cycle_count(0);
-
-        CYCCNTClock{
-            nb_cyccnt_cycles: 0,
-            previous_cyccnt_val: 0,
-            dwt
-        }
-
+            dcb.enable_trace();
+            DWT::unlock();
+            dwt.enable_cycle_counter();
+            dwt.set_cycle_count(0);
+            
+            // Store the DWT peripheral into a shared object
+            let mut dwt_slot = DWT.borrow(cs).borrow_mut(); 
+            *dwt_slot.deref_mut() = Some(dwt);
+        });
 }
 
 }
