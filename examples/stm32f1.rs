@@ -18,7 +18,7 @@ type Duration = cortex_m_microclock::Duration::<SYSCLK_FREQ_HZ>;
 #[entry]
 fn main() -> ! {
        
-    let mut cp = cortex_m::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
     let mut p = stm32f103::Peripherals::take().unwrap();
 
     //Configure clock tree
