@@ -1,3 +1,17 @@
+// This example has been tested on a a STM32F103 blue pill (STM32F103C8T6 MCU) target with Ubuntu
+// 22.0.4.
+// The following code initializes the MCU and triggers a loop which repeatidly creates a 1 second delay and sends its measure to the host through RTT tracing.
+// # How to run it ?
+// - You must have installed `probe-run` and the `thumbv7m-none-eabi` toolchain . 
+//      - Follow instructions [here](https://crates.io/crates/probe-run) to install probe-run.
+//      - For installing the toolchain : `cargo install thumbv7m-none-eabi` 
+// - Connect a ST-LINK probe to the blue pill with SWCLK, SWDIO, RST, GND, and 3V3 lines. Be sure
+// your udev rules are well configured on Linux.
+// - run `DEFMT_LOG=trace cargo run --example stm32f1` at the root of the project. Microcontroller
+// flashing should occur and you should see a new trace emitted every second by the microcontroller
+// on your console.
+//
+
 #![no_main]
 #![no_std]
 
@@ -22,7 +36,8 @@ fn main() -> ! {
     let mut p = stm32f103::Peripherals::take().unwrap();
 
     //Configure clock tree
-    let rcc = &mut p.RCC; 
+    let rcc = &mut p.RCC;
+
     // Set 8mhz HSE as direct SYSCLK source    
     rcc.cr.write(|w| w
         .hseon().set_bit()
