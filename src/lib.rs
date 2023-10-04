@@ -1,8 +1,5 @@
-// Copyright (c) 2023, Antoine Mugnier
-// All rights reserved.
-// 
-// This source code is licensed under the BSD-style license found in the
-// LICENSE file in the root directory of this source tree.
+// Copyright © 2023 cortex-m-microclock. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! This crate provides a software clock which relies on the CYCCNT counter present in most Cortex-M chips 
 //! to allow user to measure time and produce delays. The precision of the
@@ -16,7 +13,7 @@
 //! # Underlaying hardware
 //! The clock is based on the CYCCNT counter from the Cortex-M DWT peripheral, which increments
 //! with each processor clock cycle. However as the CYCCNT upcounter is only 32 bits wide, it may overflow 
-//! quite rapidly depending on your SYSCLK frequency. The `CYCCNTClock` keeps track of 
+//! quite rapidly depending on your SYSCLK frequency. The [`CYCCNTClock`] keeps track of 
 //! multiple CYCCNT cycles  using an internal counter so it can be used to evaluate very large durations of time.
 //!
 //! # Crate structure
@@ -32,7 +29,7 @@
 //!
 //! ```min_update_freq = SYS_CLK_FREQ/(2³²)```
 //!
-//! Note that the [`CYCCNTClock::now()`] and [`CYCCNTClock::delay()]` methods implicitely call the [`CYCCNTClock::update()`] method.
+//! Note that the [`CYCCNTClock::now()`] and [`CYCCNTClock::delay()`] methods implicitely call the [`CYCCNTClock::update()`] method.
 //! 
 //! # Example
 //!  A complete example of the use of this crate on a STMF103 blue pill is featured in the `examples` directory of this
@@ -70,7 +67,7 @@ impl <const SYSCLK_HZ :u32 > CYCCNTClock<SYSCLK_HZ>{
    const MAX_CYCCNT_VAL: u32 = core::u32::MAX;
 
     /// Return an `Instant` object corresponding to a snapshot created at the time this method was called.
-    /// Panic if the counter has not been initialized with `init()` before.
+    /// Panic if the counter has not been initialized with [`CYCCNTClock::init()`] before.
     ///
     /// ```
     ///    const SYSCLK_FREQ_HZ : u32 = 8_000_000;
@@ -104,7 +101,7 @@ impl <const SYSCLK_HZ :u32 > CYCCNTClock<SYSCLK_HZ>{
         
     /// Blocking wait for the duration specified as argument
     /// Interrupts can still trigger during this call.
-    /// Panic if the counter has not been initialized with `init()` before.
+    /// Panic if the counter has not been initialized with [`CYCCNTClock::init()`] before.
     /// ```
     ///    const SYSCLK_FREQ_HZ : u32 = 8_000_000;
     ///    let t1 = CYCCNTClock<SYSCLK_FREQ_HZ>::now();
@@ -128,7 +125,7 @@ impl <const SYSCLK_HZ :u32 > CYCCNTClock<SYSCLK_HZ>{
     /// Must be called at least one time for every CYCCNT counter cycle after init. Otherwise
     /// time counting will be corrupted.
     /// In general, calling this method in every SysTick IRQ call is the simpler option
-    /// This method will NOT panic if the `init()` method has not be called first.
+    /// This method will NOT panic if the [`CYCCNTClock::init()`] method has not be called first.
    pub fn update(){
         
        interrupt::free( |cs|{
