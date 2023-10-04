@@ -1,9 +1,21 @@
 [package]
 authors = ["AntoineMugnier <amugnier@europe.com>"]
 edition = "2021"
-readme = "README.md"
+readme = "README.MD"
+license = "MIT OR Apache-2.0"
 name = "cortex-m-microclock"
+repository = "https://github.com/AntoineMugnier/cortex-m-microclock.git"
 version = "0.1.0"
+
+categories = ['date-and-time', 'development-tools::profiling', 'embedded']
+description = "A simple software clock for Cortex-M devices based on the CYCCNT hardware counter"
+keywords = [
+    'CYCCNT',
+    'DWT',
+    'cortex-m',
+    'counter',
+    'microseconds'
+]
 
 [dependencies]
 cortex-m = {version="0.7.7", features=["critical-section-single-core"]}

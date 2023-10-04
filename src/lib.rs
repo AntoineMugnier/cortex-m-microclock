@@ -1,3 +1,9 @@
+// Copyright (c) 2023, Antoine Mugnier
+// All rights reserved.
+// 
+// This source code is licensed under the BSD-style license found in the
+// LICENSE file in the root directory of this source tree.
+
 //! This crate provides a software clock which relies on the CYCCNT counter present in most Cortex-M chips 
 //! to allow user to measure time and produce delays. The precision of the
 //! clock depends on your microcontroller core frequency. If you have a core running at at least
@@ -14,7 +20,7 @@
 //! multiple CYCCNT cycles  using an internal counter so it can be used to evaluate very large durations of time.
 //!
 //! # Crate structure
-//! The `CYCCNTClock` is the structure representing the software clock. This structure is a
+//! The [`CYCCNTClock`] is the structure representing the software clock. This structure is a
 //! singleton exposing all the methods of the crate available to user. All these methods are static and
 //! can be called from any thread without concurrency issues.    
 //! 

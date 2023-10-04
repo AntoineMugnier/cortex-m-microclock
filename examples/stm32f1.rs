@@ -1,7 +1,11 @@
+// Copyright © 2023 cortex-m-microclock. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // This example has been tested on a a STM32F103 blue pill (STM32F103C8T6 MCU) target with Ubuntu
-// 22.0.4.
+// 22.0.4.  
 // The following code initializes the MCU and triggers a loop which repeatidly creates a 1 second delay and sends its measure to the host through RTT tracing.
-// # How to run it ?
+// 
+// ##  How to run it ?
 // - You must have installed `probe-run` and the `thumbv7m-none-eabi` toolchain . 
 //      - Follow instructions [here](https://crates.io/crates/probe-run) to install probe-run.
 //      - For installing the toolchain : `cargo install thumbv7m-none-eabi` 
